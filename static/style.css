@@ -85,6 +85,113 @@ h1 {
     transform: translate(-50%, -50%) scale(1.2);
 }
 
+/* Search bar styles */
+#search-container {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 100;
+    width: 300px;
+    font-family: 'Courier New', monospace;
+}
+
+#search-bar {
+    width: 100%;
+    padding: 8px 12px;
+    background-color: rgba(0, 0, 0, 0.8);
+    border: 1px solid #0ff;
+    border-radius: 4px;
+    color: #0ff;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    outline: none;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+    transition: all 0.3s ease;
+}
+
+#search-bar::placeholder {
+    color: rgba(0, 255, 255, 0.5);
+    font-style: italic;
+}
+
+#search-bar:focus {
+    border-color: #0fa;
+    box-shadow: 0 0 15px rgba(0, 255, 170, 0.5);
+}
+
+#search-results {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 5px;
+    background-color: rgba(0, 0, 0, 0.9);
+    border: 1px solid #0ff;
+    border-radius: 4px;
+    max-height: 300px;
+    overflow-y: auto;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+}
+
+.search-result {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: #ddd;
+}
+
+.search-result:last-child {
+    border-bottom: none;
+}
+
+.search-result:hover {
+    background-color: rgba(0, 255, 255, 0.1);
+    color: #fff;
+}
+
+.search-result .path {
+    font-size: 12px;
+    color: #999;
+    margin-top: 3px;
+}
+
+.search-result .highlight {
+    color: #0fa;
+    font-weight: bold;
+}
+
+.search-result.file {
+    border-left: 3px solid #0fa;
+}
+
+.search-result.directory {
+    border-left: 3px solid #0ff;
+}
+
+/* Scrollbar styling for search results */
+#search-results::-webkit-scrollbar {
+    width: 6px;
+}
+
+#search-results::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+#search-results::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 255, 255, 0.5);
+    border-radius: 6px;
+}
+
+/* No results message */
+.no-results {
+    padding: 10px;
+    text-align: center;
+    color: #777;
+    font-style: italic;
+}
+
 .modal-overlay {
     position: fixed;
     top: 0;

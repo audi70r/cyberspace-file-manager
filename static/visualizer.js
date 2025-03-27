@@ -20,6 +20,11 @@ let objectDetails = new Map(); // Store object details for hover info
 let font; // Store loaded font
 let highlightedObject = null; // Store currently highlighted object
 let highlightedMaterial = null; // Store original material
+let objectsById = new Map(); // Store objects by file/folder path for searching
+let isFlying = false; // Flag to indicate if camera is automatically flying
+let flyingTarget = null; // Target position for automatic flying
+let flyingLookAt = null; // Look at position for automatic flying
+let searchFocused = false; // Flag to track if search is focused
 
 // Initialize the scene
 function init() {
@@ -76,6 +81,15 @@ function init() {
     // Add event listener for pointer lock changes
     document.addEventListener('pointerlockchange', onPointerLockChange);
     
+    // Handle Ctrl+F to focus search
+    document.addEventListener('keydown', function(e) {
+        // Check if Ctrl+F was pressed
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            e.preventDefault(); // Prevent browser's default search
+            document.getElementById('search-bar').focus();
+        }
+    });
+    
     // Grid removed for cleaner visualization
 
     // Add ambient light
@@ -91,8 +105,12 @@ function init() {
     scene.add(controls.getObject());
 
     // Set up keyboard controls for WASD movement
-    document.addEventListener('keydown', onKeyDown);
-    document.addEventListener('keyup', onKeyUp);
+    // Store references to event handlers so they can be properly removed
+    window.onKeyDownHandler = onKeyDown;
+    window.onKeyUpHandler = onKeyUp;
+    
+    document.addEventListener('keydown', window.onKeyDownHandler);
+    document.addEventListener('keyup', window.onKeyUpHandler);
 
     // Mouse move event for raycasting
     document.addEventListener('mousemove', onMouseMove);
@@ -123,6 +141,11 @@ function onPointerLockChange() {
 
 // Key down event handler
 function onKeyDown(event) {
+    // If search is focused, don't handle keyboard events for camera controls
+    if (searchFocused || document.querySelector('.modal-overlay')) {
+        return;
+    }
+    
     switch (event.code) {
         case 'KeyW':
         case 'ArrowUp':
@@ -181,6 +204,9 @@ function onKeyDown(event) {
                     moveUp = false;
                     moveDown = false;
                     
+                    // Stop any camera movement immediately
+                    velocity.set(0, 0, 0);
+                    
                     const modal = document.createElement('div');
                     modal.className = 'modal';
                     
@@ -228,14 +254,18 @@ function onKeyDown(event) {
                         // Function to remove modal and restore controls
                         const closeModal = () => {
                             document.body.removeChild(overlay);
-                            // Re-enable keyboard event handling for movement
-                            document.addEventListener('keydown', onKeyDown);
-                            document.addEventListener('keyup', onKeyUp);
+                            
+                            // Only restore keyboard controls if search is not focused
+                            if (!document.activeElement || document.activeElement !== document.getElementById('search-bar')) {
+                                // Re-enable keyboard event handling for movement
+                                document.addEventListener('keydown', window.onKeyDownHandler);
+                                document.addEventListener('keyup', window.onKeyUpHandler);
+                            }
                         };
                         
                         // Temporarily remove keyboard event listeners to prevent movement
-                        document.removeEventListener('keydown', onKeyDown);
-                        document.removeEventListener('keyup', onKeyUp);
+                        document.removeEventListener('keydown', window.onKeyDownHandler);
+                        document.removeEventListener('keyup', window.onKeyUpHandler);
                         
                         cancelBtn.addEventListener('click', function() {
                             closeModal();
@@ -306,6 +336,9 @@ function onKeyDown(event) {
                     moveUp = false;
                     moveDown = false;
                     
+                    // Stop any camera movement immediately
+                    velocity.set(0, 0, 0);
+                    
                     const modal = document.createElement('div');
                     modal.className = 'modal';
                     
@@ -353,8 +386,9 @@ function onKeyDown(event) {
                     // Focus input after modal is added to DOM
                     setTimeout(() => input.focus(), 0);
                     
-                    // Handle input events
-                    input.addEventListener('keydown', function(e) {
+                    // Handle input events - need a separate event handler
+                    // that doesn't trigger the main keyboard controls
+                    const handleInputKeys = function(e) {
                         // Prevent event propagation to avoid triggering movement
                         e.stopPropagation();
                         
@@ -363,23 +397,31 @@ function onKeyDown(event) {
                         } else if (e.key === 'Escape') {
                             cancelBtn.click();
                         }
-                    });
+                    };
+                    
+                    // Add the event listener directly to the input element
+                    input.addEventListener('keydown', handleInputKeys);
                     
                     // Return a promise that resolves with the new name
                     return new Promise((resolve) => {
                         // Function to remove modal and restore controls
                         const closeModal = () => {
                             document.body.removeChild(overlay);
-                            // Re-enable keyboard event handling for movement
-                            document.addEventListener('keydown', onKeyDown);
-                            document.addEventListener('keyup', onKeyUp);
+                            
+                            // Remove the input's keydown listener
+                            input.removeEventListener('keydown', handleInputKeys);
+                            
+                            // Only restore keyboard controls if search is not focused
+                            if (!document.activeElement || document.activeElement !== document.getElementById('search-bar')) {
+                                // Re-enable keyboard event handling for movement
+                                document.addEventListener('keydown', window.onKeyDownHandler);
+                                document.addEventListener('keyup', window.onKeyUpHandler);
+                            }
                         };
                         
                         // Temporarily remove keyboard event listeners to prevent movement
-                        document.removeEventListener('keydown', onKeyDown);
-                        document.removeEventListener('keyup', onKeyUp);
-                        
-                        // Still allow keydown within the input field for modal controls
+                        document.removeEventListener('keydown', window.onKeyDownHandler);
+                        document.removeEventListener('keyup', window.onKeyUpHandler);
                         
                         cancelBtn.addEventListener('click', function() {
                             closeModal();
@@ -435,6 +477,11 @@ function onKeyDown(event) {
 
 // Key up event handler
 function onKeyUp(event) {
+    // If search is focused, don't handle keyboard events for camera controls
+    if (searchFocused || document.querySelector('.modal-overlay')) {
+        return;
+    }
+    
     switch (event.code) {
         case 'KeyW':
         case 'ArrowUp':
@@ -479,6 +526,7 @@ function loadFilesystemData() {
     // Clear current objects and scene
     objects = [];
     objectDetails = new Map();
+    objectsById = new Map();
     
     // Remove all objects from the scene except camera and controls
     while(scene.children.length > 0){ 
@@ -504,6 +552,8 @@ function loadFilesystemData() {
             console.log('Filesystem data loaded:', data);
             filesystemData = data;
             createVisualization(filesystemData);
+            // Initialize search functionality after data is loaded
+            initSearch();
         })
         .catch(error => console.error('Error loading filesystem data:', error));
 }
@@ -668,6 +718,14 @@ function createNode(node, x, y, z, parentMetrics) {
             type: 'Directory',
             children: node.children ? node.children.length : 0,
             modified: new Date(node.modified).toLocaleString()
+        });
+        
+        // Store object reference by path for search functionality
+        objectsById.set(node.path, {
+            object: dirMesh,
+            position: dirMesh.position.clone(),
+            parentGroup: nodeGroup,
+            type: 'Directory'
         });
         
         // Position children inside this container
@@ -986,6 +1044,18 @@ function createNode(node, x, y, z, parentMetrics) {
             size: formatFileSize(node.size),
             modified: new Date(node.modified).toLocaleString()
         });
+        
+        // Store object reference by path for search functionality
+        objectsById.set(node.path, {
+            object: fileMesh,
+            position: new THREE.Vector3(
+                nodeGroup.position.x + fileMesh.position.x,
+                nodeGroup.position.y + fileMesh.position.y,
+                nodeGroup.position.z + fileMesh.position.z
+            ),
+            parentGroup: nodeGroup,
+            type: 'File'
+        });
     }
     
     return nodeGroup;
@@ -1253,98 +1323,144 @@ function animate() {
     const time = performance.now();
     const delta = Math.min(0.1, (time - prevTime) / 1000); // Cap delta to prevent jumps
     
-    // Apply reduced friction to allow higher speeds
-    velocity.x -= velocity.x * 2.0 * delta; // Less friction for faster acceleration
-    velocity.z -= velocity.z * 2.0 * delta;
-    velocity.y -= velocity.y * 2.0 * delta; // Apply same friction to vertical movement for consistent flying
-    
-    // Get camera's forward direction vector
-    const cameraDirection = new THREE.Vector3();
-    camera.getWorldDirection(cameraDirection);
-    
-    // Create a forward vector that preserves the camera's horizontal direction but doesn't go up/down
-    // when moving forward/backward
-    const forwardDirection = new THREE.Vector3(
-        cameraDirection.x,
-        0,
-        cameraDirection.z
-    ).normalize();
-    
-    // The up/down component is only used when looking steeply up or down
-    const verticalComponent = new THREE.Vector3(
-        0,
-        cameraDirection.y,
-        0
-    );
-    
-    // Create movement direction based on camera's orientation and key presses
-    direction.set(0, 0, 0);
-    
-    if (moveForward) {
-        // When looking level, move horizontally
-        direction.add(forwardDirection);
-        // When looking steeply up/down, add vertical movement
-        if (Math.abs(cameraDirection.y) > 0.5) {
-            direction.add(verticalComponent);
+    if (isFlying && flyingTarget) {
+        // Automatic flying to target object
+        const cameraPosition = controls.getObject().position;
+        const distanceToTarget = cameraPosition.distanceTo(flyingTarget);
+        
+        if (distanceToTarget > 5) { // Continue flying until we're close enough
+            // Calculate direction to target
+            const flyDirection = new THREE.Vector3().subVectors(flyingTarget, cameraPosition).normalize();
+            
+            // Calculate speed based on distance (slow down when approaching)
+            const flySpeed = Math.min(500, Math.max(50, distanceToTarget * 30));
+            
+            // Move camera towards target
+            controls.getObject().position.add(flyDirection.multiplyScalar(flySpeed * delta));
+            
+            // Gradually look at the target while flying
+            if (flyingLookAt) {
+                // Calculate current camera direction
+                const currentDirection = new THREE.Vector3();
+                camera.getWorldDirection(currentDirection);
+                
+                // Calculate target direction
+                const targetDirection = new THREE.Vector3().subVectors(flyingLookAt, cameraPosition).normalize();
+                
+                // Interpolate between current and target direction
+                const lerpFactor = 0.05; // Adjust for smoother rotation
+                const newDirection = currentDirection.lerp(targetDirection, lerpFactor);
+                
+                // Create a quaternion from the interpolated direction
+                const targetQuaternion = new THREE.Quaternion().setFromUnitVectors(
+                    new THREE.Vector3(0, 0, -1), // Camera forward direction
+                    newDirection
+                );
+                
+                // Apply rotation to camera
+                camera.quaternion.slerp(targetQuaternion, 0.1);
+            }
+        } else {
+            // We've reached the target, stop flying
+            isFlying = false;
+            flyingTarget = null;
+            flyingLookAt = null;
         }
-    }
-    if (moveBackward) {
-        // Move in the opposite direction
-        direction.sub(forwardDirection);
-        // When looking steeply up/down, add inverted vertical movement
-        if (Math.abs(cameraDirection.y) > 0.5) {
-            direction.sub(verticalComponent);
+    } else {
+        // Normal manual movement
+        // Apply reduced friction to allow higher speeds
+        velocity.x -= velocity.x * 2.0 * delta; // Less friction for faster acceleration
+        velocity.z -= velocity.z * 2.0 * delta;
+        velocity.y -= velocity.y * 2.0 * delta; // Apply same friction to vertical movement for consistent flying
+        
+        // Skip movement processing if search is focused or a modal is open
+        if (!searchFocused && !document.querySelector('.modal-overlay')) {
+            // Get camera's forward direction vector
+            const cameraDirection = new THREE.Vector3();
+            camera.getWorldDirection(cameraDirection);
+            
+            // Create a forward vector that preserves the camera's horizontal direction but doesn't go up/down
+            // when moving forward/backward
+            const forwardDirection = new THREE.Vector3(
+                cameraDirection.x,
+                0,
+                cameraDirection.z
+            ).normalize();
+            
+            // The up/down component is only used when looking steeply up or down
+            const verticalComponent = new THREE.Vector3(
+                0,
+                cameraDirection.y,
+                0
+            );
+            
+            // Create movement direction based on camera's orientation and key presses
+            direction.set(0, 0, 0);
+            
+            if (moveForward) {
+                // When looking level, move horizontally
+                direction.add(forwardDirection);
+                // When looking steeply up/down, add vertical movement
+                if (Math.abs(cameraDirection.y) > 0.5) {
+                    direction.add(verticalComponent);
+                }
+            }
+            if (moveBackward) {
+                // Move in the opposite direction
+                direction.sub(forwardDirection);
+                // When looking steeply up/down, add inverted vertical movement
+                if (Math.abs(cameraDirection.y) > 0.5) {
+                    direction.sub(verticalComponent);
+                }
+            }
+            
+            // For sideways movement, calculate the right vector by crossing the camera direction with world up
+            // This ensures correct right/left movement regardless of camera orientation
+            const worldUp = new THREE.Vector3(0, 1, 0);
+            const right = new THREE.Vector3();
+            right.crossVectors(cameraDirection, worldUp).normalize();
+            
+            if (moveRight) {
+                direction.add(right);
+            }
+            if (moveLeft) {
+                direction.sub(right);
+            }
+            
+            // Add direct up/down movement with Space and Shift+Space
+            if (moveUp) {
+                direction.y += 1.0;
+            }
+            if (moveDown) {
+                direction.y -= 1.0;
+            }
+            
+            // Normalize for consistent speed in all directions
+            if (direction.length() > 0) {
+                direction.normalize();
+            }
+            
+            // For the grid-based visualization, we need much faster movement speed 
+            // to navigate the potentially very large structures
+            const speedFactor = boost ? 700 : 100; // 7x faster than before
+            
+            // Apply movement force in all dimensions
+            velocity.x += direction.x * speedFactor * delta;
+            velocity.z += direction.z * speedFactor * delta;
+            // Allow vertical movement based on where the camera is pointing
+            velocity.y += direction.y * speedFactor * delta;
         }
+        
+        // Calculate movement in world space
+        const movement = new THREE.Vector3(
+            velocity.x * delta,
+            velocity.y * delta,
+            velocity.z * delta
+        );
+        
+        // Apply movement directly to the camera's position
+        controls.getObject().position.add(movement);
     }
-    
-    // For sideways movement, calculate the right vector by crossing the camera direction with world up
-    // This ensures correct right/left movement regardless of camera orientation
-    const worldUp = new THREE.Vector3(0, 1, 0);
-    const right = new THREE.Vector3();
-    right.crossVectors(cameraDirection, worldUp).normalize();
-    
-    if (moveRight) {
-        direction.add(right);
-    }
-    if (moveLeft) {
-        direction.sub(right);
-    }
-    
-    // Add direct up/down movement with Space and Shift+Space
-    if (moveUp) {
-        direction.y += 1.0;
-    }
-    if (moveDown) {
-        direction.y -= 1.0;
-    }
-    
-    // Normalize for consistent speed in all directions
-    if (direction.length() > 0) {
-        direction.normalize();
-    }
-    
-    // For the grid-based visualization, we need much faster movement speed 
-    // to navigate the potentially very large structures
-    const speedFactor = boost ? 700 : 100; // 7x faster than before
-    
-    // Apply movement force in all dimensions
-    velocity.x += direction.x * speedFactor * delta;
-    velocity.z += direction.z * speedFactor * delta;
-    // Allow vertical movement based on where the camera is pointing
-    velocity.y += direction.y * speedFactor * delta;
-    
-    // Calculate movement in world space
-    const movement = new THREE.Vector3(
-        velocity.x * delta,
-        velocity.y * delta,
-        velocity.z * delta
-    );
-    
-    // Apply movement directly to the camera's position
-    controls.getObject().position.add(movement);
-    
-    // Remove floor collision check to allow full 3D movement
-    // This enables flying up and down freely
     
     prevTime = time;
     
@@ -1353,6 +1469,185 @@ function animate() {
     
     // Render scene
     renderer.render(scene, camera);
+}
+
+// Search functionality
+function initSearch() {
+    const searchBar = document.getElementById('search-bar');
+    const searchResults = document.getElementById('search-results');
+    
+    // Listen for input on search bar
+    searchBar.addEventListener('input', function(e) {
+        const query = e.target.value.trim().toLowerCase();
+        
+        // Clear previous results
+        searchResults.innerHTML = '';
+        
+        if (query.length < 2) {
+            searchResults.style.display = 'none';
+            return;
+        }
+        
+        // Search through objects by name
+        const results = [];
+        for (const [path, details] of objectsById.entries()) {
+            // Get the name from the path (last segment)
+            const name = path.split('/').pop();
+            
+            if (name.toLowerCase().includes(query)) {
+                results.push({
+                    name: name,
+                    path: path,
+                    type: details.type
+                });
+            }
+        }
+        
+        // Sort results: directories first, then alphabetically
+        results.sort((a, b) => {
+            if (a.type !== b.type) {
+                return a.type === 'Directory' ? -1 : 1;
+            }
+            return a.name.localeCompare(b.name);
+        });
+        
+        // Display results
+        if (results.length > 0) {
+            results.slice(0, 10).forEach(result => {
+                const resultElement = document.createElement('div');
+                resultElement.className = `search-result ${result.type.toLowerCase()}`;
+                
+                // Highlight the matching text
+                const highlightedName = result.name.replace(
+                    new RegExp(`(${query})`, 'gi'),
+                    '<span class="highlight">$1</span>'
+                );
+                
+                resultElement.innerHTML = `
+                    <div>${highlightedName}</div>
+                    <div class="path">${result.path}</div>
+                `;
+                
+                // Add click event to navigate to the object
+                resultElement.addEventListener('click', function() {
+                    flyToObject(result.path);
+                    // Return focus to the 3D view after clicking a result
+                    searchBar.blur();
+                });
+                
+                searchResults.appendChild(resultElement);
+            });
+            
+            if (results.length > 10) {
+                const moreResults = document.createElement('div');
+                moreResults.className = 'search-result';
+                moreResults.innerHTML = `<div>${results.length - 10} more results...</div>`;
+                searchResults.appendChild(moreResults);
+            }
+            
+            searchResults.style.display = 'block';
+        } else {
+            const noResults = document.createElement('div');
+            noResults.className = 'no-results';
+            noResults.textContent = 'No results found';
+            searchResults.appendChild(noResults);
+            searchResults.style.display = 'block';
+        }
+    });
+    
+    // Close search results when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!searchBar.contains(e.target) && !searchResults.contains(e.target)) {
+            searchResults.style.display = 'none';
+            
+            // If search bar is focused and we click elsewhere, blur it to restore controls
+            if (document.activeElement === searchBar) {
+                searchBar.blur();
+            }
+        }
+    });
+    
+    // Prevent clicks on search results from propagating (to avoid triggering camera controls)
+    searchResults.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+    
+    // Prevent search bar clicks from triggering camera lock
+    searchBar.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+    
+    // Focus events for search bar
+    searchBar.addEventListener('focus', function() {
+        searchFocused = true;
+        document.removeEventListener('keydown', window.onKeyDownHandler);
+        document.removeEventListener('keyup', window.onKeyUpHandler);
+        
+        // Reset movement state
+        moveForward = false;
+        moveBackward = false;
+        moveLeft = false;
+        moveRight = false;
+        moveUp = false;
+        moveDown = false;
+        boost = false;
+        
+        // Stop any camera movement immediately
+        velocity.set(0, 0, 0);
+    });
+    
+    searchBar.addEventListener('blur', function() {
+        searchFocused = false;
+        
+        // Only restore controls if no modal is open
+        if (!document.querySelector('.modal-overlay')) {
+            document.addEventListener('keydown', window.onKeyDownHandler);
+            document.addEventListener('keyup', window.onKeyUpHandler);
+        }
+    });
+}
+
+// Function to fly to a specific object
+function flyToObject(path) {
+    const objectInfo = objectsById.get(path);
+    if (!objectInfo) return;
+    
+    // Exit pointer lock if active
+    if (document.pointerLockElement) {
+        document.exitPointerLock();
+    }
+    
+    // Set up flying to the object position
+    isFlying = true;
+    
+    // Get world position of the object
+    const worldPosition = new THREE.Vector3();
+    objectInfo.object.getWorldPosition(worldPosition);
+    
+    // Set target position slightly offset from the object
+    const offsetDistance = 20; // Distance to keep from the object
+    
+    // For directory, set position above and to the side a bit
+    if (objectInfo.type === 'Directory') {
+        flyingTarget = new THREE.Vector3(
+            worldPosition.x + offsetDistance,
+            worldPosition.y + offsetDistance,
+            worldPosition.z + offsetDistance
+        );
+    } else {
+        // For files, position in front of the object
+        flyingTarget = new THREE.Vector3(
+            worldPosition.x,
+            worldPosition.y,
+            worldPosition.z + offsetDistance
+        );
+    }
+    
+    // Set the look-at point to be the object's position
+    flyingLookAt = worldPosition;
+    
+    // Close search results
+    document.getElementById('search-results').style.display = 'none';
 }
 
 // Initialize and animate

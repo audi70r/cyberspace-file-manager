@@ -2,7 +2,7 @@
 
 A cyberpunk-style 3D visualization and management tool for your filesystem.
 
-![Cyberspace File Manager](https://github.com/audi70r/cyberspace-file-manager/screenshot.jpg)
+![Cyberspace File Manager](https://raw.githubusercontent.com/audi70r/cyberspace-file-manager/master/screenshot.jpg)
 
 ## Features
 
@@ -78,6 +78,11 @@ Then open your browser and navigate to `http://localhost:8080` (or the port you 
 - **Click** on objects to open them in the default application
 - **ESC** - Unlock mouse cursor
 - **Hover** over objects to see file/folder details
+- **Search bar** - Find files and folders by name
+  - Press **Ctrl+F** to focus the search bar
+  - Click a search result to fly to that object
+  - Keyboard controls are disabled while searching
+  - Focus returns to 3D view after selecting a result
 
 ## File Type Color Coding
 
