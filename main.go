@@ -396,10 +396,13 @@ func main() {
 
 	// Start the server
 	serverAddr := ":" + strconv.Itoa(port)
-	fmt.Printf("Starting server at http://localhost%s\n", serverAddr)
+	fmt.Printf("Cyberspace File Manager\n")
+	fmt.Printf("======================\n")
+	fmt.Printf("Server running at http://localhost%s\n", serverAddr)
 	fmt.Printf("Visualizing directory: %s\n", absPath)
 	if len(ignoreDirs) > 0 {
 		fmt.Printf("Ignoring directories: %s\n", strings.Join(ignoreDirs, ", "))
 	}
+	fmt.Printf("Press Ctrl+C to exit\n")
 	log.Fatal(http.ListenAndServe(serverAddr, nil))
 }
