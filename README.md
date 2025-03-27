@@ -2,7 +2,7 @@
 
 A cyberpunk-style 3D visualization and management tool for your filesystem.
 
-![Cyberspace File Manager](https://github.com/yourusername/cyberspace-file-manager/raw/main/screenshots/screenshot.png)
+![Cyberspace File Manager](https://github.com/audi70r/cyberspace-file-manager/screenshot.jpg)
 
 ## Features
 
