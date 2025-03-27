@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3DFS - 3D Filesystem Visualizer</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div id="info">
+        <h1>3D Filesystem Visualizer</h1>
+        <div id="hover-info">Hover over an object to see details</div>
+        <div id="controls-info">WASD to move, Mouse to look around, SPACE to move up, SHIFT+SPACE to move down, SHIFT to boost speed, R to rename selected object, DELETE/BACKSPACE to delete</div>
+    </div>
+    <div id="crosshair">+</div>
+    <div id="container"></div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/PointerLockControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/FontLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/geometries/TextGeometry.js"></script>
+    <script src="/static/visualizer.js"></script>
+</body>
+</html>
