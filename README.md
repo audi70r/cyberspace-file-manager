@@ -61,3 +61,4 @@ The application scans the specified directory recursively and generates a 3D cit
 ## License
 
 MIT# cyberspace-file-manager
+# cyberspace-file-manager
